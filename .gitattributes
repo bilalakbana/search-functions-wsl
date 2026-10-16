@@ -1,0 +1,3 @@
+# The scripts must keep LF line endings even when a Git with core.autocrlf=true checks them out
+# (bash and zsh fail on CRLF with "$'\r': command not found").
+* text=auto eol=lf

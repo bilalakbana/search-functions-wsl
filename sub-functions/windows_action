@@ -1,0 +1,60 @@
+#!/bin/bash
+# windows_action: the WSL stand-in for xdg-open, the Linux file manager and wl-copy.
+#   usage: windows_action open      PATH   open PATH with its default Windows application
+#          windows_action reveal    PATH   open Explorer with PATH (file or folder) selected
+#          windows_action copy-path PATH   copy the Windows form of PATH (C:\... or \\wsl.localhost\...)
+#          windows_action copy-text TEXT   copy TEXT to the clipboard
+#
+# The Windows side runs in powershell.exe. The path or text never becomes part of a shell command line:
+# it reaches PowerShell as the environment variable SF_VALUE (shared with Windows through WSLENV), so
+# neither cmd.exe nor PowerShell ever parses it. Only "reveal" builds an argument from it, for Explorer:
+# /select,"PATH". The PowerShell statements below contain no double quotes, so WSL's argument quoting
+# cannot change them.
+#
+# fzf's execute-silent shows nothing, so errors go to stderr and, inside tmux, to the status line.
+
+fail() {
+    local msg="windows_action: $*"
+    printf '%s\n' "$msg" >&2
+    [[ -n $TMUX ]] && tmux display-message "${msg//\#/##}"   # "##" is a literal "#" for tmux
+    exit 1
+}
+
+# Absolute Windows path of an existing file or folder; "." and ".." are resolved, symlinks are kept.
+to_windows_path() {
+    local path
+    path=$(realpath -s -- "$1") || fail "cannot resolve path: $1"
+    [[ -e $path ]] || fail "no such file or folder: $path"
+    wslpath -w "$path" || fail "wslpath cannot convert: $path"
+}
+
+# Run one PowerShell statement with SF_VALUE set; on failure report PowerShell's first error line.
+run_powershell() {
+    local script=$1 value=$2 err
+    if ! err=$(SF_VALUE=$value WSLENV="SF_VALUE${WSLENV:+:$WSLENV}" \
+        powershell.exe -NoProfile -NonInteractive -Command "\$ErrorActionPreference='Stop'; $script" \
+        </dev/null 2>&1 >/dev/null); then
+        err=${err//$'\r'/}
+        fail "$action failed for $value${err:+: ${err%%$'\n'*}}"
+    fi
+}
+
+(( $# == 2 )) || fail "usage: windows_action open|reveal|copy-path PATH  or  windows_action copy-text TEXT"
+action=$1
+command -v powershell.exe >/dev/null || fail "powershell.exe not found in PATH (WSL interop and appendWindowsPath must be on)"
+
+case $action in
+    open)
+        winpath=$(to_windows_path "$2") || exit 1
+        run_powershell 'Invoke-Item -LiteralPath $env:SF_VALUE' "$winpath" ;;
+    reveal)
+        winpath=$(to_windows_path "$2") || exit 1
+        run_powershell "Start-Process -FilePath explorer.exe -ArgumentList ('/select,' + [char]34 + \$env:SF_VALUE + [char]34)" "$winpath" ;;
+    copy-path)
+        winpath=$(to_windows_path "$2") || exit 1
+        run_powershell 'Set-Clipboard -Value $env:SF_VALUE' "$winpath" ;;
+    copy-text)
+        run_powershell 'Set-Clipboard -Value $env:SF_VALUE' "$2" ;;
+    *)
+        fail "unknown action: $action" ;;
+esac
