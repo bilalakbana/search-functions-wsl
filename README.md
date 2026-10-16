@@ -125,9 +125,9 @@ cargo install ripgrep-all  # if using Rust
      not, check that `/etc/wsl.conf` does not set `enabled=false` or `appendWindowsPath=false` under `[interop]`.
 
 2. Clone the repo into `~/.SearchFunctions` — the scripts call each other through this fixed path, so the
-   folder name matters (the repo is private: set up an SSH key or `gh auth login` inside WSL first):
+   folder name matters:
 ```bash
-git clone git@github.com:bilalakbana/search-functions-wsl.git ~/.SearchFunctions
+git clone https://github.com/bilalakbana/search-functions-wsl.git ~/.SearchFunctions
 ```
 
 3. `sub-functions/is_text_file` is a statically linked x86-64 build, so it runs on every WSL 1/2 distribution.
@@ -152,7 +152,7 @@ source ~/.SearchFunctions/sub-functions/git_logs          # gfzf* | logs* (need 
 
 This repo shares its history with search-functions, so fixes made there can be merged:
 ```bash
-git remote add upstream git@github.com:bilalakbana/search-functions.git   # once
+git remote add upstream https://github.com/bilalakbana/search-functions.git   # once
 git pull upstream main
 ```
 Conflicts are expected only where the editions differ: on the `Enter`, `Ctrl-e` and `Ctrl-c` lines keep this
