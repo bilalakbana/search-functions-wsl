@@ -8,8 +8,8 @@
 # The Windows side runs in powershell.exe. The path or text never becomes part of a shell command line:
 # it reaches PowerShell as the environment variable SF_VALUE (shared with Windows through WSLENV), so
 # neither cmd.exe nor PowerShell ever parses it. Only "reveal" builds an argument from it, for Explorer:
-# /select,"PATH". The PowerShell statements below contain no double quotes, so WSL's argument quoting
-# cannot change them.
+# /select,"PATH", and therefore refuses names containing '"' or control characters. The PowerShell
+# statements below contain no double quotes, so WSL's argument quoting cannot change them.
 #
 # fzf's execute-silent shows nothing, so errors go to stderr and, inside tmux, to the status line.
 
@@ -49,6 +49,9 @@ case $action in
         run_powershell 'Invoke-Item -LiteralPath $env:SF_VALUE' "$winpath" ;;
     reveal)
         winpath=$(to_windows_path "$2") || exit 1
+        # Explorer parses /select,"PATH" itself: a '"' (legal in Linux names) would close the quotes early and
+        # turn the rest of the name into further Explorer arguments, e.g. a program for Explorer to start.
+        [[ $winpath == *[\"[:cntrl:]]* ]] && fail "Explorer cannot select a name containing '\"' or a control character: $winpath"
         run_powershell "Start-Process -FilePath explorer.exe -ArgumentList ('/select,' + [char]34 + \$env:SF_VALUE + [char]34)" "$winpath" ;;
     copy-path)
         winpath=$(to_windows_path "$2") || exit 1
